@@ -344,6 +344,12 @@ of a book, but you are not limited only by the book properties we described.
 Create your own book type of your dreams!
 -}
 
+data Book = MkBook
+    { bookName  :: String
+    , bookAuthor :: String
+    , bookPages  :: Int
+    }
+
 {- |
 =⚔️= Task 2
 
@@ -375,6 +381,25 @@ after the fight. The battle has the following possible outcomes:
 ♫ NOTE: In this task, you need to implement only a single round of the fight.
 
 -}
+
+data Knight = MkKnight
+    { knightHealth  :: Int
+    , knightAttack  :: Int
+    , knightGold    :: Int
+    }
+
+data Monster = MkMonster
+    { monsterHealth :: Int
+    , monsterAttack :: Int
+    , monsterGold   :: Int
+    }
+
+fight :: Knight -> Monster -> Int
+fight knight monster =
+    let newMonsterHealth = monsterHealth monster - knightAttack knight
+    in if newMonsterHealth <= 0
+        then knightGold knight + monsterGold monster
+        else -1
 
 {- |
 =🛡= Sum types
@@ -462,6 +487,12 @@ Create a simple enumeration for the meal types (e.g. breakfast). The one who
 comes up with the most number of names wins the challenge. Use your creativity!
 -}
 
+data Meal
+    = Breakfast
+    | Brunch
+    | Lunch
+    | Dinner
+
 {- |
 =⚔️= Task 4
 
@@ -481,6 +512,56 @@ After defining the city, implement the following functions:
    complicated task, walls can be built only if the city has a castle
    and at least 10 living __people__ inside in all houses of the city in total.
 -}
+
+data City = City
+    { cityCastle  :: Castle
+    , cityFacility :: Facility
+    , cityHouses  :: [House]
+    }
+
+data Castle
+    = None
+    | Castle String
+    | CastleWithWalls String
+
+data Facility = Church | Library
+
+data House
+    = One
+    | Two
+    | Three
+    | Four
+
+countPeople :: House -> Int
+countPeople house = case house of
+    One   -> 1
+    Two   -> 2
+    Three -> 3
+    Four  -> 4
+
+buildCastle :: City -> String -> City
+buildCastle city name = case cityCastle city of
+    CastleWithWalls _ -> city { cityCastle = CastleWithWalls name }
+    _                 -> city { cityCastle = Castle name }
+
+buildHouse :: City -> House -> City
+buildHouse city house = city { cityHouses = house : cityHouses city }
+
+buildWalls :: City -> City
+buildWalls city
+    | hasCastle && totalPeople >= 10 = city { cityCastle = CastleWithWalls name }
+    | otherwise = city
+  where
+    hasCastle = case cityCastle city of
+        CastleWithWalls _ -> True
+        Castle _          -> True
+        _                 -> False
+    name = case cityCastle city of
+        CastleWithWalls n -> n
+        Castle n          -> n
+        _                 -> ""
+    totalPeople = sum $ map countPeople $ cityHouses city
+
 
 {-
 =🛡= Newtypes
@@ -563,21 +644,35 @@ introducing extra newtypes.
     implementation of the "hitPlayer" function at all!
 -}
 data Player = Player
-    { playerHealth    :: Int
-    , playerArmor     :: Int
-    , playerAttack    :: Int
-    , playerDexterity :: Int
-    , playerStrength  :: Int
+    { playerHealth    :: Health
+    , playerArmor     :: Armor
+    , playerAttack    :: Attack
+    , playerDexterity :: Dexterity
+    , playerStrength  :: Strength
     }
 
-calculatePlayerDamage :: Int -> Int -> Int
-calculatePlayerDamage attack strength = attack + strength
+newtype Health = MkHealth Int
 
-calculatePlayerDefense :: Int -> Int -> Int
-calculatePlayerDefense armor dexterity = armor * dexterity
+newtype Armor = MkArmor Int
 
-calculatePlayerHit :: Int -> Int -> Int -> Int
-calculatePlayerHit damage defense health = health + defense - damage
+newtype Attack = MkAttack Int
+
+newtype Dexterity = MkDexterity Int
+
+newtype Strength = MkStrength Int
+
+newtype Defense = MkDefense Int
+
+newtype Damage = MkDamage Int
+
+calculatePlayerDamage :: Attack -> Strength -> Damage
+calculatePlayerDamage (MkAttack attack) (MkStrength strength) = MkDamage(attack * strength)
+
+calculatePlayerDefense :: Armor -> Dexterity -> Defense
+calculatePlayerDefense (MkArmor armor) (MkDexterity dexterity) = MkDefense(armor * dexterity)
+
+calculatePlayerHit :: Damage -> Defense -> Health -> Health
+calculatePlayerHit (MkDamage damage) (MkDefense defense) (MkHealth health) = MkHealth(health + defense - damage)
 
 -- The second player hits first player and the new first player is returned
 hitPlayer :: Player -> Player -> Player
@@ -755,6 +850,20 @@ parametrise data types in places where values can be of any general type.
   maybe-treasure ;)
 -}
 
+data DragonLair x = DragonLair
+    { dragonLairDragon :: Dragon
+    , dragonLairTreasure :: Maybe (TreasureChest x)
+    }
+
+newtype Dragon = MkDragon MagicalPower
+
+data MagicalPower = FireBreath | IceBreath | LightningBreath
+
+data TreasureChest x = TreasureChest
+    { treasureChestGold :: Int
+    , treasureChestLoot :: x
+    }
+
 {-
 =🛡= Typeclasses
 
@@ -912,6 +1021,18 @@ Implement instances of "Append" for the following types:
 class Append a where
     append :: a -> a -> a
 
+newtype Gold = MkGold Int
+
+instance Append Gold where
+    append (MkGold x) (MkGold y) = MkGold (x + y)
+
+instance Append [a] where
+    append xs ys = xs ++ ys
+
+instance Append a => Append (Maybe a) where
+    append (Just x) (Just y) = Just (append x y)
+    append Nothing y = y
+    append x Nothing = x
 
 {-
 =🛡= Standard Typeclasses and Deriving
@@ -972,6 +1093,20 @@ implement the following functions:
 
 🕯 HINT: to implement this task, derive some standard typeclasses
 -}
+
+data Day = Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
+    deriving (Show, Read, Eq, Ord, Enum, Bounded)
+
+isWeekend :: Day -> Bool
+isWeekend Saturday = True
+isWeekend Sunday = True
+isWeekend _ = False
+
+nextDay :: Day -> Day
+nextDay day = if day == maxBound then minBound else succ day
+
+daysToParty :: Day -> Int
+daysToParty day = fromEnum Friday - fromEnum day
 
 {-
 =💣= Task 9*
