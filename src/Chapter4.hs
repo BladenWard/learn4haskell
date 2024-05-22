@@ -113,22 +113,30 @@ As always, try to guess the output first! And don't forget to insert
 the output in here:
 
 >>> :k Char
+Char :: *
 
 >>> :k Bool
+Bool :: *
 
 >>> :k [Int]
+[Int] :: *
 
 >>> :k []
+[] :: * -> *
 
 >>> :k (->)
+(->) :: * -> * -> *
 
 >>> :k Either
+Either :: * -> * -> *
 
 >>> data Trinity a b c = MkTrinity a b c
 >>> :k Trinity
+Trinity :: * -> * -> * -> *
 
 >>> data IntBox f = MkIntBox (f Int)
 >>> :k IntBox
+IntBox :: (* -> *) -> *
 
 -}
 
@@ -292,7 +300,8 @@ values and apply them to the type level?
 -}
 instance Functor (Secret e) where
     fmap :: (a -> b) -> Secret e a -> Secret e b
-    fmap = error "fmap for Box: not implemented!"
+    fmap _ (Trap e) = Trap e
+    fmap f (Reward a) = Reward (f a)
 
 {- |
 =⚔️= Task 3
@@ -305,6 +314,11 @@ typeclasses for standard data types.
 data List a
     = Empty
     | Cons a (List a)
+
+instance Functor List where
+    fmap :: (a -> b) -> List a -> List b
+    fmap _ Empty = Empty
+    fmap f (Cons x xs) = Cons (f x) (fmap f xs)
 
 {- |
 =🛡= Applicative
@@ -471,10 +485,11 @@ Implement the Applicative instance for our 'Secret' data type from before.
 -}
 instance Applicative (Secret e) where
     pure :: a -> Secret e a
-    pure = error "pure Secret: Not implemented!"
+    pure = Reward
 
     (<*>) :: Secret e (a -> b) -> Secret e a -> Secret e b
-    (<*>) = error "(<*>) Secret: Not implemented!"
+    Trap e <*> _ = Trap e
+    Reward f <*> x = fmap f x
 
 {- |
 =⚔️= Task 5
@@ -487,6 +502,19 @@ Implement the 'Applicative' instance for our 'List' type.
   may also need to implement a few useful helper functions for our List
   type.
 -}
+
+instance Applicative List where
+    pure :: a -> List a
+    pure x = Cons x Empty
+
+    (<*>) :: List (a -> b) -> List a -> List b
+    Empty <*> _ = Empty
+    _ <*> Empty = Empty
+    Cons f fs <*> l = append (fmap f l) (fs <*> l)
+      where
+        append :: List a -> List a -> List a
+        append Empty ys = ys
+        append (Cons x xs) ys = Cons x (append xs ys)
 
 
 {- |
@@ -599,7 +627,8 @@ Implement the 'Monad' instance for our 'Secret' type.
 -}
 instance Monad (Secret e) where
     (>>=) :: Secret e a -> (a -> Secret e b) -> Secret e b
-    (>>=) = error "bind Secret: Not implemented!"
+    Trap e >>= _ = Trap e
+    Reward a >>= f = f a
 
 {- |
 =⚔️= Task 7
@@ -610,6 +639,17 @@ Implement the 'Monad' instance for our lists.
   maybe a few) to flatten lists of lists to a single list.
 -}
 
+instance Monad List where
+    (>>=) :: List a -> (a -> List b) -> List b
+    l >>= f = flatten (fmap f l)
+      where
+        flatten :: List (List b) -> List b
+        flatten Empty = Empty
+        flatten (Cons x xs) = append x (flatten xs)
+          where
+            append :: List b -> List b -> List b
+            append Empty ys = ys
+            append (Cons x xs) ys = Cons x (append xs ys)
 
 {- |
 =💣= Task 8*: Before the Final Boss
@@ -628,7 +668,7 @@ Can you implement a monad version of AND, polymorphic over any monad?
 🕯 HINT: Use "(>>=)", "pure" and anonymous function
 -}
 andM :: (Monad m) => m Bool -> m Bool -> m Bool
-andM = error "andM: Not implemented!"
+andM ma mb = ma >>= \a -> if a then mb else pure False
 
 {- |
 =🐉= Task 9*: Final Dungeon Boss
